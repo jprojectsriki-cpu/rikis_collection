@@ -362,6 +362,7 @@
             left: 0;
             width: 100vw; 
             height: calc(100vh - var(--header-h));
+            height: calc(100dvh - var(--header-h)); /* スマホのアドレスバーを除いた高さ */
             background: rgba(244, 238, 219, 0.98);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -370,6 +371,7 @@
             justify-content: flex-start;
             align-items: center;
             padding-top: 2rem;
+            padding-bottom: 3rem; /* 一番下の項目が切れないように余白を確保 */
             gap: 0.8rem;
             z-index: 999;
             opacity: 0;
@@ -409,20 +411,24 @@
         }
 
         .mobile-sub-menu {
-            max-height: 0;
-            overflow: hidden;
+            display: none; /* 閉じている間は非表示（高さの制限は使わない） */
+            flex-direction: column;
+            flex-shrink: 0;
             width: 85%;
             max-width: 300px;
-            transition: max-height 0.3s ease-out;
-            display: flex;
-            flex-direction: column;
             gap: 0.5rem;
         }
 
         .mobile-sub-menu.is-open {
-            max-height: 400px;
+            display: flex; /* 開いたら、項目の数に関係なくすべて表示 */
             margin-top: 0.2rem;
             margin-bottom: 0.4rem;
+            animation: subMenuOpen 0.25s ease-out;
+        }
+
+        @keyframes subMenuOpen {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
         .mobile-sub-item {
