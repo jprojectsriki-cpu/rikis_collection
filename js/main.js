@@ -96,12 +96,22 @@
         return card;
     }
 
+    // R-SERIES のメニューが空のとき、理由を表示する（中身が空のまま開いて見えなくなるのを防ぐ）
+    function renderNavMessage(text) {
+        var mobile = document.getElementById('mobileSubMenu');
+        var desktop = document.getElementById('dropdownMenu');
+        var style = 'font-size:0.8rem; color:var(--text-sub); padding:0.6rem 1rem; text-align:center;';
+        if (mobile && !mobile.children.length) mobile.append(h('span', { style: style, text: text }));
+        if (desktop && !desktop.children.length) desktop.append(h('span', { style: style, text: text }));
+    }
+
     function renderNav(products) {
         var desktop = document.getElementById('dropdownMenu');
         var mobile = document.getElementById('mobileSubMenu');
         if (!desktop || !mobile) return;
         desktop.replaceChildren();
         mobile.replaceChildren();
+        if (!products.length) { renderNavMessage('プロダクトを準備中です。'); return; }
 
         products.forEach(function (p) {
             desktop.append(
@@ -130,6 +140,7 @@
     }
 
     function showProductError() {
+        renderNavMessage('読み込めませんでした。再読み込みしてください。');
         var list = document.getElementById('productList');
         if (!list || list.querySelector('.business-card')) return;
         list.replaceChildren(h('p', {
@@ -219,12 +230,24 @@
         });
         handleScrollAnimation();
 
+        // スマホのアコーディオン：開閉と、矢印・aria の更新をまとめる
+        function setAccordion(open) {
+            mobileSubMenu.classList.toggle('is-open', open);
+            mobileAccordionBtn.setAttribute('aria-expanded', String(open));
+            mobileAccordionIcon.textContent = open ? '▲' : '▼';
+            if (!open) return;
+            // 画面より長いときも、最後の項目まで見える位置までメニューをスクロールする
+            window.requestAnimationFrame(function () {
+                var last = mobileSubMenu.lastElementChild;
+                if (last && last.scrollIntoView) last.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            });
+        }
+
         function closeMenus() {
             navDropdown.classList.remove('active');
             dropdownBtn.setAttribute('aria-expanded', 'false');
             mobileNav.classList.remove('is-open');
-            mobileSubMenu.classList.remove('is-open');
-            mobileAccordionIcon.textContent = '▼';
+            setAccordion(false);
         }
 
         // PC: ドロップダウン
@@ -242,10 +265,13 @@
         });
 
         // スマホ: メニューとアコーディオン
-        menuBtn.addEventListener('click', function () { mobileNav.classList.toggle('is-open'); });
+        mobileAccordionBtn.setAttribute('aria-expanded', 'false');
+        menuBtn.addEventListener('click', function () {
+            var open = mobileNav.classList.toggle('is-open');
+            if (!open) setAccordion(false); // メニューを閉じたら、アコーディオンも閉じる
+        });
         mobileAccordionBtn.addEventListener('click', function () {
-            var isOpen = mobileSubMenu.classList.toggle('is-open');
-            mobileAccordionIcon.textContent = isOpen ? '▲' : '▼';
+            setAccordion(!mobileSubMenu.classList.contains('is-open'));
         });
 
         // ページ内リンク(動的に作られるメニュー項目にも効くよう、まとめて処理)
