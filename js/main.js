@@ -118,10 +118,10 @@
                 h('a', { href: '#' + p.slug, class: 'dropdown-item' },
                     h('span', { class: 'title-en', text: p.nameEn }),
                     h('span', { class: 'title-ja', text: p.subtitle })));
-            mobile.append(
+                        mobile.append(
                 h('a', { href: '#' + p.slug, class: 'mobile-link mobile-sub-item' },
-                    h('span', { text: p.nameEn }),
-                    h('span', { style: 'font-size:0.7rem; color:var(--text-sub);', text: p.subtitle })));
+                    h('span', { class: 'title-en', text: p.nameEn }),
+                    h('span', { class: 'title-ja', text: p.subtitle })));
         });
     }
 
