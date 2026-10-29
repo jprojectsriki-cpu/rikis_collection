@@ -1478,6 +1478,11 @@ section[id] { scroll-margin-top: var(--header-h); }
 }
 .deck-stage .business-card.is-front:hover { box-shadow: 7px 7px 0px var(--text-main); }
 
+/* どのカードでも、タグとプロダクト名を同じ高さ（上そろえ）にする。ボタンはいちばん下にそろえる */
+.deck-stage .business-body { justify-content: flex-start; }
+.deck-stage .business-detail { margin-bottom: 1.5rem; }
+.deck-stage .card-btn { margin-top: auto; }
+
 .deck-controls {
     display: flex;
     align-items: center;
@@ -1523,6 +1528,8 @@ section[id] { scroll-margin-top: var(--header-h); }
 
 @media screen and (max-width: 960px) {
     .deck-stage { padding: 24px 24px 0 0; }
+    /* 画像は同じ高さにして、余った高さは説明の側で受け取る（タグと名前の位置をそろえるため） */
+    .deck-stage .business-card { grid-template-rows: 240px 1fr; }
     .deck-hint-pc { display: none; }
     .deck-hint-sp { display: inline; }
     .deck-controls { gap: 1rem; }
