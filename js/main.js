@@ -1,5 +1,5 @@
 /* ReicherRick Portfolio - front-end
- * - プロダクト一覧は GAS(API)から取得して描画する
+ * - プロダクト一覧は GAS(API)から取得して描画する（カードを重ねたスライダーで表示）
  * - お問い合わせは GAS(API)へ POST する
  */
 (function () {
@@ -36,7 +36,7 @@
         return /^https?:\/\//i.test(String(url || ''));
     }
 
-    var COLORS = ['pink', 'cyan', 'green', 'purple'];
+    var COLORS = ['pink', 'cyan', 'green', 'purple', 'orange'];
 
     /* ---------------------------------------------------------
      * プロダクトカードの描画
@@ -56,7 +56,7 @@
         return h('div', null, h('h4', { text: title }), h('p', { text: text }));
     }
 
-    function buildCard(p, reverse) {
+    function buildCard(p) {
         var color = COLORS.indexOf(p.tagColor) >= 0 ? p.tagColor : 'pink';
 
         var name = h('h3', { class: 'business-name dela-gothic-one-regular' }, p.nameEn);
@@ -87,13 +87,214 @@
             details,
             button);
 
-        var card = h('div', {
+        var card = h('article', {
             id: p.slug,
-            class: 'business-card' + (reverse ? ' reverse' : '') + ' pop-card animate-item ' + (reverse ? 'from-right' : 'from-left')
+            class: 'business-card pop-card',
+            'aria-roledescription': 'スライド',
+            'aria-label': p.nameEn + (p.subtitle ? '（' + p.subtitle + '）' : '')
         });
-        if (reverse) { card.append(body, buildImage(p)); }
-        else { card.append(buildImage(p), body); }
+        card.append(buildImage(p), body);
         return card;
+    }
+
+    /* ---------------------------------------------------------
+     * カードを重ねたスライダー
+     * - いちばん前のカードの後ろに、次のカードが少しずつずれて重なって見える
+     * - PC：前のカード・後ろに見えているカード・左右のボタン・点をクリックで切り替え
+     * - スマホ：前のカードを左右にスワイプで切り替え
+     * - キーボード：スライダーを選んで ← → で切り替え
+     * --------------------------------------------------------- */
+    var deck = null;
+
+    function createDeck(products) {
+        var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var cards = products.map(function (p) { return buildCard(p); });
+        var count = cards.length;
+        var current = 0;
+        var busy = false;
+
+        var stage = h('div', { class: 'deck-stage' }, cards);
+        var counter = h('span', { class: 'deck-count dela-gothic-one-regular', 'aria-live': 'polite' });
+        var dots = h('div', { class: 'deck-dots', role: 'tablist', 'aria-label': '表示するプロダクトを選ぶ' });
+        var prevBtn = h('button', { type: 'button', class: 'deck-btn dela-gothic-one-regular', 'aria-label': '前のプロダクト', text: '◀' });
+        var nextBtn = h('button', { type: 'button', class: 'deck-btn dela-gothic-one-regular', 'aria-label': '次のプロダクト', text: '▶' });
+        var hint = h('p', { class: 'deck-hint' });
+        hint.append(
+            h('span', { class: 'deck-hint-pc', text: 'カードをクリックすると、次のプロダクトに切り替わります（← → キーでも操作できます）' }),
+            h('span', { class: 'deck-hint-sp', text: 'カードを左右にスワイプして切り替え' }));
+
+        products.forEach(function (p, i) {
+            var dot = h('button', { type: 'button', class: 'deck-dot', role: 'tab', 'aria-label': p.nameEn });
+            dot.addEventListener('click', function () { goTo(i); });
+            dots.append(dot);
+        });
+
+        var root = h('div', {
+            class: 'deck animate-item zoom-in',
+            tabindex: '0',
+            'aria-roledescription': 'カルーセル',
+            'aria-label': 'R-SERIES のプロダクト（← → キーで切り替え）'
+        }, stage, h('div', { class: 'deck-controls' }, prevBtn, h('div', { class: 'deck-center' }, counter, dots), nextBtn), hint);
+
+        function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+        // 重なりのずれ（スマホは小さめ）
+        function offset() { return window.innerWidth <= 960 ? 10 : 18; }
+
+        // 前から何枚目か（0 がいちばん前）
+        function posOf(i) { return (i - current + count) % count; }
+
+        function place(card, pos, extra) {
+            var o = offset();
+            var shown = Math.min(pos, 2);
+            var deg = window.innerWidth <= 960 ? 0.5 : 0.8; // 縦に長いスマホのカードは、傾きを小さくして画面からはみ出さないようにする
+            var t = extra || ('translate(' + (shown * o) + 'px, ' + (-shown * o) + 'px) rotate(' + (shown * deg) + 'deg) scale(' + (1 - shown * 0.02) + ')');
+            card.style.transform = t;
+            card.style.zIndex = String(count - pos);
+            card.style.opacity = pos > 2 ? '0' : '1';
+            card.classList.toggle('is-front', pos === 0);
+            card.classList.toggle('is-peek', pos === 1 || pos === 2);
+            // 後ろのカードは、リンクにフォーカスが移らないようにする
+            if (pos === 0) { card.removeAttribute('inert'); card.removeAttribute('aria-hidden'); }
+            else { card.setAttribute('inert', ''); card.setAttribute('aria-hidden', 'true'); }
+        }
+
+        function render() {
+            cards.forEach(function (c, i) { place(c, posOf(i)); });
+            counter.textContent = pad2(current + 1) + ' / ' + pad2(count);
+            Array.prototype.forEach.call(dots.children, function (d, i) {
+                d.setAttribute('aria-selected', String(i === current));
+            });
+        }
+
+        // いちばん前のカードを、左右どちらかに飛ばしてから後ろへ回す
+        function flyOut(card, dir, after) {
+            if (reduceMotion) { after(); return; }
+            busy = true;
+            card.style.transition = 'transform 0.32s ease-in, opacity 0.32s ease-in';
+            card.style.transform = 'translate(' + (dir * 115) + '%, 20px) rotate(' + (dir * 14) + 'deg)';
+            card.style.opacity = '0';
+            setTimeout(function () {
+                card.style.transition = 'none';
+                after();
+                // 後ろに回ったあと、次の描画から元の動きにもどす
+                requestAnimationFrame(function () { requestAnimationFrame(function () {
+                    card.style.transition = '';
+                    busy = false;
+                }); });
+            }, 320);
+        }
+
+        function next(dir) {
+            if (busy || count < 2) return;
+            var front = cards[current];
+            flyOut(front, dir || -1, function () {
+                current = (current + 1) % count;
+                render();
+            });
+            if (reduceMotion) return;
+            // 2枚目以降は、すぐに前へ詰める
+            cards.forEach(function (c, i) { if (i !== current) place(c, Math.max(0, posOf(i) - 1)); });
+        }
+
+        function prev() {
+            if (busy || count < 2) return;
+            current = (current - 1 + count) % count;
+            var incoming = cards[current];
+            if (reduceMotion) { render(); return; }
+            busy = true;
+            // いちばん後ろのカードを、左の外側から前へ入れる
+            incoming.style.transition = 'none';
+            incoming.style.zIndex = String(count + 1);
+            incoming.style.opacity = '0';
+            incoming.style.transform = 'translate(-115%, 20px) rotate(-14deg)';
+            requestAnimationFrame(function () { requestAnimationFrame(function () {
+                incoming.style.transition = '';
+                render();
+                setTimeout(function () { busy = false; }, 420);
+            }); });
+        }
+
+        function goTo(i) {
+            if (i === current || busy) return;
+            if (i === (current + 1) % count) { next(-1); return; }
+            if (i === (current - 1 + count) % count) { prev(); return; }
+            current = i;
+            render();
+        }
+
+        prevBtn.addEventListener('click', function () { prev(); });
+        nextBtn.addEventListener('click', function () { next(-1); });
+        root.addEventListener('keydown', function (e) {
+            if (e.target !== root) return;
+            if (e.key === 'ArrowRight') { e.preventDefault(); next(-1); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+        });
+
+        /* ---- クリック・スワイプ ---- */
+        var drag = null;
+        var moved = false;
+
+        stage.addEventListener('pointerdown', function (e) {
+            if (busy || e.button !== 0) return;
+            var card = e.target.closest('.business-card');
+            if (!card || !card.classList.contains('is-front')) return;
+            if (e.target.closest('a, button')) return; // リンク（詳細を見る）はそのまま使えるようにする
+            drag = { card: card, x: e.clientX, y: e.clientY, dx: 0, id: e.pointerId, horizontal: null };
+            moved = false;
+        });
+
+        stage.addEventListener('pointermove', function (e) {
+            if (!drag || e.pointerId !== drag.id) return;
+            var dx = e.clientX - drag.x;
+            var dy = e.clientY - drag.y;
+            if (drag.horizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+                drag.horizontal = Math.abs(dx) > Math.abs(dy);
+                if (!drag.horizontal) { drag = null; return; } // 縦の動きは、ページのスクロールにまかせる
+                try { stage.setPointerCapture(e.pointerId); } catch (err) { /* 無視 */ }
+                drag.card.style.transition = 'none';
+            }
+            if (!drag.horizontal) return;
+            moved = true;
+            drag.dx = dx;
+            drag.card.style.transform = 'translate(' + dx + 'px, 0) rotate(' + (dx / 25) + 'deg)';
+        });
+
+        function endDrag(e) {
+            if (!drag || (e && e.pointerId !== drag.id)) return;
+            var d = drag;
+            drag = null;
+            if (!d.horizontal) return;
+            d.card.style.transition = '';
+            if (Math.abs(d.dx) > Math.min(110, stage.clientWidth * 0.22)) {
+                next(d.dx < 0 ? -1 : 1);
+            } else {
+                place(d.card, 0); // もとの位置にもどす
+            }
+        }
+        stage.addEventListener('pointerup', endDrag);
+        stage.addEventListener('pointercancel', endDrag);
+
+        // クリック：いちばん前のカード、または後ろに見えているカードの端 → 次のプロダクトへ
+        // （後ろのカードは inert なので、クリックは stage が受け取る）
+        stage.addEventListener('click', function (e) {
+            if (moved) { moved = false; e.preventDefault(); return; } // スワイプのあとのクリックは無視
+            if (e.target.closest('a, button')) return;                 // 「詳細を見る」などのリンクはそのまま
+            var card = e.target.closest('.business-card');
+            if (card && !card.classList.contains('is-front')) return;
+            next(-1);
+        });
+
+        window.addEventListener('resize', function () { if (!busy) render(); });
+
+        render();
+        if (count < 2) root.classList.add('is-single');
+
+        return {
+            el: root,
+            indexOf: function (id) { for (var i = 0; i < count; i++) { if (cards[i].id === id) return i; } return -1; },
+            goTo: function (i) { if (i >= 0) { current = i; render(); } }
+        };
     }
 
     // R-SERIES のメニューが空のとき、理由を表示する（中身が空のまま開いて見えなくなるのを防ぐ）
@@ -133,7 +334,11 @@
         if (!products.length) {
             list.append(h('p', { class: 'empty-note', text: 'プロダクトを準備中です。' }));
         }
-        products.forEach(function (p, i) { list.append(buildCard(p, i % 2 === 1)); });
+        deck = null;
+        if (products.length) {
+            deck = createDeck(products);
+            list.append(deck.el);
+        }
 
         renderNav(products);
         handleScrollAnimation();
@@ -283,8 +488,16 @@
             if (href === '#') {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
-                var target = document.getElementById(href.slice(1));
-                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                var id = href.slice(1);
+                var index = deck ? deck.indexOf(id) : -1;
+                if (index >= 0) {
+                    // R-SERIES のメニューから：そのプロダクトのカードを前に出して、スライダーまでスクロール
+                    deck.goTo(index);
+                    deck.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    var target = document.getElementById(id);
+                    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
             }
             closeMenus();
         });

@@ -702,6 +702,7 @@
         .tag-cyan { background: #2A6F97; color: #FAF6E8; }
         .tag-green { background: #2A9D8F; color: #FAF6E8; }
         .tag-purple { background: #6A040F; color: #FAF6E8; }
+        .tag-orange { background: #C8641E; color: #FAF6E8; }
 
         .business-name {
             font-size: 1.6rem;
@@ -1061,7 +1062,8 @@ section[id] { scroll-margin-top: var(--header-h); }
 .card-btn.c-cyan   { background: #2A6F97; color: #FAF6E8; }
 .card-btn.c-green  { background: #2A9D8F; color: #FAF6E8; }
 .card-btn.c-purple { background: #6A040F; color: #FAF6E8; }
-.card-btn.c-cyan:hover, .card-btn.c-green:hover, .card-btn.c-purple:hover {
+.card-btn.c-orange { background: #C8641E; color: #FAF6E8; }
+.card-btn.c-cyan:hover, .card-btn.c-green:hover, .card-btn.c-purple:hover, .card-btn.c-orange:hover {
     background: var(--fc-red); color: #FAF6E8;
 }
 .card-btn.is-disabled,
@@ -1437,4 +1439,97 @@ section[id] { scroll-margin-top: var(--header-h); }
     .send-dots::after { animation: none; content: '...'; }
     .pixel-bar i { animation: none; background: var(--fc-red); opacity: 0.8; }
     .contact-card .btn.is-sending .iconhub-icon { animation: none; }
+}
+
+/* ---------------------------------------------------------
+ * R-SERIES：カードを重ねたスライダー
+ * --------------------------------------------------------- */
+.deck {
+    position: relative;
+    margin-bottom: 3.5rem;
+    outline: none;
+}
+.deck:focus-visible { outline: 3px dashed var(--fc-red); outline-offset: 10px; }
+
+/* カードを同じ場所に重ねる（高さは、いちばん高いカードに合わせる） */
+.deck-stage {
+    display: grid;
+    padding: 44px 44px 0 0;
+    touch-action: pan-y;          /* 縦のスクロールはそのまま、横の動きはスワイプに使う */
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: pointer;
+}
+.deck-stage .business-card {
+    grid-area: 1 / 1;
+    margin-bottom: 0;
+    transform-origin: 50% 100%;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease, box-shadow 0.2s ease;
+    will-change: transform;
+}
+.deck-stage .business-card img { -webkit-user-drag: none; user-select: none; pointer-events: none; }
+.deck-stage .business-card.is-peek { box-shadow: 4px 4px 0px var(--text-main); }
+.deck-stage .business-card.is-peek::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: rgba(42, 31, 20, 0.08);
+}
+.deck-stage .business-card.is-front:hover { box-shadow: 7px 7px 0px var(--text-main); }
+
+.deck-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.4rem;
+    margin-top: 1.8rem;
+}
+.deck-btn {
+    width: 52px;
+    height: 52px;
+    border: 3px solid var(--text-main);
+    background: var(--fc-gold);
+    color: var(--text-main);
+    box-shadow: 3px 3px 0px var(--text-main);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.deck-btn:hover { background: var(--fc-red); color: #FAF6E8; transform: translate(-2px, -2px); box-shadow: 5px 5px 0px var(--text-main); }
+.deck-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px var(--text-main); }
+.deck-btn:focus-visible, .deck-dot:focus-visible { outline: 3px dashed var(--fc-red); outline-offset: 3px; }
+
+.deck-center { display: flex; flex-direction: column; align-items: center; gap: 0.55rem; min-width: 120px; }
+.deck-count { font-size: 0.95rem; letter-spacing: 0.08em; color: var(--text-main); }
+.deck-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.55rem; }
+.deck-dot {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 2px solid var(--text-main);
+    background: var(--bg-card);
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+.deck-dot[aria-selected="true"] { background: var(--fc-red); transform: scale(1.2); }
+
+.deck-hint { margin-top: 0.9rem; text-align: center; font-size: 0.8rem; font-weight: 700; color: var(--text-sub); }
+.deck-hint-sp { display: none; }
+
+.deck.is-single .deck-stage { padding: 0; cursor: default; }
+.deck.is-single .deck-controls,
+.deck.is-single .deck-hint { display: none; }
+
+@media screen and (max-width: 960px) {
+    .deck-stage { padding: 24px 24px 0 0; }
+    .deck-hint-pc { display: none; }
+    .deck-hint-sp { display: inline; }
+    .deck-controls { gap: 1rem; }
+    .deck-btn { width: 46px; height: 46px; }
+    .deck-dot { width: 18px; height: 18px; }   /* 指で押しやすい大きさ */
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .deck-stage .business-card { transition: none; }
 }
