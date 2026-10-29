@@ -285,13 +285,70 @@
             next(-1);
         });
 
-        window.addEventListener('resize', function () { if (!busy) render(); });
+        /* ---- タグとプロダクト名の位置を、すべてのカードでそろえる ----
+         * 1) タグは1行に収める（入らないときは、文字を少しだけ小さくする）
+         * 2) それでも高さがちがうときは、タグの下の余白で調整して、プロダクト名の位置をそろえる */
+        var tags = cards.map(function (c) { return c.querySelector('.business-tag'); });
+        var names = cards.map(function (c) { return c.querySelector('.business-name'); });
+
+        function alignHeads() {
+            var MIN_PX = 10;
+            var sizes = [];
+            // ① それぞれのタグが1行に収まる文字の大きさを調べる
+            tags.forEach(function (t) {
+                if (!t) return;
+                t.style.fontSize = '';
+                t.style.whiteSpace = 'nowrap';
+                t.style.marginBottom = '';
+                var body = t.parentNode;
+                var cs = window.getComputedStyle(body);
+                var avail = body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+                var size = parseFloat(window.getComputedStyle(t).fontSize);
+                // scrollWidth：枠に収まりきらない部分も含めた、文字全体の幅
+                while (Math.max(t.offsetWidth, t.scrollWidth) > avail + 0.5 && size > MIN_PX) {
+                    size -= 0.5;
+                    t.style.fontSize = size + 'px';
+                }
+                t._avail = avail;
+                sizes.push(size);
+            });
+            // ② すべてのタグを、いちばん小さい大きさにそろえる（カードごとに文字の大きさが変わらないように）
+            var common = Math.min.apply(null, sizes);
+            tags.forEach(function (t) {
+                if (!t) return;
+                t.style.fontSize = common + 'px';
+                if (Math.max(t.offsetWidth, t.scrollWidth) > t._avail + 0.5) t.style.whiteSpace = 'normal'; // とても長いときだけ折り返す
+            });
+            // カードの上端からプロダクト名までの距離を、いちばん大きいものに合わせる
+            var tops = names.map(function (n) {
+                if (!n) return 0;
+                var body = n.parentNode;
+                return n.offsetParent === body ? n.offsetTop : n.offsetTop - body.offsetTop;
+            });
+            var maxTop = Math.max.apply(null, tops);
+            tags.forEach(function (t, i) {
+                if (!t || tops[i] >= maxTop) return;
+                var mb = parseFloat(window.getComputedStyle(t).marginBottom);
+                t.style.marginBottom = (mb + maxTop - tops[i]) + 'px';
+            });
+        }
+
+        var resizeTimer = null;
+        window.addEventListener('resize', function () {
+            if (!busy) render();
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(alignHeads, 120);
+        });
+        // Webフォントの読み込みが終わると文字の幅が変わるので、もう一度そろえる
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { alignHeads(); });
+        if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', function () { alignHeads(); });
 
         render();
         if (count < 2) root.classList.add('is-single');
 
         return {
             el: root,
+            align: alignHeads,
             indexOf: function (id) { for (var i = 0; i < count; i++) { if (cards[i].id === id) return i; } return -1; },
             goTo: function (i) { if (i >= 0) { current = i; render(); } }
         };
@@ -338,6 +395,7 @@
         if (products.length) {
             deck = createDeck(products);
             list.append(deck.el);
+            deck.align(); // 画面に入れてから、位置をそろえる
         }
 
         renderNav(products);
