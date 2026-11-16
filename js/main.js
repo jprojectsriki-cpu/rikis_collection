@@ -36,7 +36,7 @@
         return /^https?:\/\//i.test(String(url || ''));
     }
 
-    var COLORS = ['pink', 'cyan', 'green', 'purple', 'orange'];
+    var COLORS = ['pink', 'cyan', 'green', 'purple', 'orange', 'indigo'];
 
     /* ---------------------------------------------------------
      * プロダクトカードの描画

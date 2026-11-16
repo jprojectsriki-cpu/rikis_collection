@@ -703,6 +703,7 @@
         .tag-green { background: #2A9D8F; color: #FAF6E8; }
         .tag-purple { background: #6A040F; color: #FAF6E8; }
         .tag-orange { background: #C8641E; color: #FAF6E8; }
+        .tag-indigo { background: #4B3F8F; color: #FAF6E8; }
 
         .business-name {
             font-size: 1.6rem;
@@ -1063,7 +1064,8 @@ section[id] { scroll-margin-top: var(--header-h); }
 .card-btn.c-green  { background: #2A9D8F; color: #FAF6E8; }
 .card-btn.c-purple { background: #6A040F; color: #FAF6E8; }
 .card-btn.c-orange { background: #C8641E; color: #FAF6E8; }
-.card-btn.c-cyan:hover, .card-btn.c-green:hover, .card-btn.c-purple:hover, .card-btn.c-orange:hover {
+.card-btn.c-indigo { background: #4B3F8F; color: #FAF6E8; }
+.card-btn.c-cyan:hover, .card-btn.c-green:hover, .card-btn.c-purple:hover, .card-btn.c-orange:hover, .card-btn.c-indigo:hover {
     background: var(--fc-red); color: #FAF6E8;
 }
 .card-btn.is-disabled,
