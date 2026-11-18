@@ -118,7 +118,7 @@
     }
 
     function reveal(scope) {
-        (scope || document).querySelectorAll('.hero-text > *, .sec-title, .sec-sub, .panel, .card, .timeline li').forEach(function (el) {
+        (scope || document).querySelectorAll('.hero-text > *, .sec-title, .sec-sub, .panel, .timeline li').forEach(function (el) {
             if (el.dataset.rv) return;
             el.dataset.rv = 1;
             if (!io) return; // 古いブラウザでは、アニメーションなしでそのまま表示
@@ -177,16 +177,212 @@
         if (sub.classList.contains('open')) sub.style.maxHeight = sub.scrollHeight + 'px';
     }
 
+    /* ---------------------------------------------------------
+     * 3D の円形カルーセル（プロダクトが増えても、そのまま動く）
+     * - カードを円筒の上に並べ、いちばん前のカードの左右に次のカードが見える
+     * - 切り替え：◀ ▶ ボタン／カードを左右にドラッグ・スワイプ／← → キー／点／横のカードをクリック
+     * - 並べる角度は、1枚あたり最大45°。8枚以上になると、ぐるっと一周の輪になる
+     * --------------------------------------------------------- */
+    var ringApi = null;
+
+    function createRing(products, startAt) {
+        var N = products.length;
+        var cards = products.map(buildCard);
+        var step = Math.min(45, 360 / N);       // 隣のカードとの角度
+        var cur = Math.max(0, Math.min(N - 1, startAt || 0));
+        var CW = 340, RH = 560, R = 0;
+        var prevOff = [];
+
+        var ring = h('div', { class: 'rring' }, cards);
+        var stage = h('div', {
+            class: 'rstage', tabindex: '0', role: 'group',
+            'aria-roledescription': 'カルーセル',
+            'aria-label': 'R-SERIES のプロダクト（← → キーで切り替え）'
+        }, ring);
+
+        var counter = h('span', { class: 'rcount', 'aria-live': 'polite' });
+        var dots = h('div', { class: 'rdots' });
+        var prevBtn = h('button', { type: 'button', class: 'rbtn', 'aria-label': '前のプロダクト', text: '◀' });
+        var nextBtn = h('button', { type: 'button', class: 'rbtn', 'aria-label': '次のプロダクト', text: '▶' });
+        products.forEach(function (p, i) {
+            var d = h('button', { type: 'button', class: 'rdot', 'aria-label': p.nameEn });
+            d.addEventListener('click', function () { goTo(i); });
+            dots.append(d);
+        });
+        var hint = h('p', { class: 'rhint' },
+            h('span', { class: 'rhint-pc', text: 'カードをクリック・ドラッグ、または ← → キーで切り替え' }),
+            h('span', { class: 'rhint-sp', text: 'カードを左右にスワイプして切り替え' }));
+        var ctl = h('div', { class: 'rctl' }, prevBtn, counter, nextBtn);
+        var wrap = h('div', { class: 'rwrap' }, stage, N > 1 ? ctl : null, N > 1 ? dots : null, N > 1 ? hint : null);
+
+        function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+        // いちばん前から何枚ぶん右（＋）か左（－）か
+        function offOf(i) {
+            var d = (((i - cur) % N) + N) % N;
+            return d > N / 2 ? d - N : d;
+        }
+        // 前から離れるほど、うすくする
+        function alpha(x) {
+            x = Math.abs(x);
+            if (x <= 1) return 1 - 0.2 * x;
+            if (x <= 2) return 0.8 - 0.35 * (x - 1);
+            if (x <= 3) return 0.45 * (3 - x);
+            return 0;
+        }
+
+        function place(frac) {
+            var jumped = [];
+            cards.forEach(function (c, i) {
+                var o = offOf(i);
+                var p = o + frac;
+                // 輪の反対側へ回りこむカードは、動きをつけずに移す
+                if (prevOff[i] !== undefined && N > 1 && Math.abs(o - prevOff[i]) > N / 2) {
+                    c.style.transition = 'none';
+                    jumped.push(c);
+                }
+                prevOff[i] = o;
+                c.style.transform = 'translateZ(' + (-R) + 'px) rotateY(' + (p * step).toFixed(2) + 'deg) translateZ(' + R + 'px)';
+                var a = alpha(p);
+                c.style.opacity = a.toFixed(3);
+                c.style.pointerEvents = a > 0.05 ? '' : 'none';
+                var front = o === 0;
+                c.classList.toggle('is-front', front);
+                if (front) c.removeAttribute('aria-hidden'); else c.setAttribute('aria-hidden', 'true');
+                Array.prototype.forEach.call(c.querySelectorAll('a'), function (a2) { a2.tabIndex = front ? 0 : -1; });
+            });
+            if (jumped.length) {
+                void stage.offsetWidth; // 動きなしで移したあと、元にもどす
+                jumped.forEach(function (c) { c.style.transition = ''; });
+            }
+        }
+
+        function render() {
+            place(0);
+            counter.textContent = pad2(cur + 1) + ' / ' + pad2(N);
+            Array.prototype.forEach.call(dots.children, function (d, i) {
+                if (i === cur) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current');
+            });
+        }
+
+        function goTo(i) { if (i === cur || i < 0 || i >= N) return; cur = i; render(); }
+        function next() { if (N > 1) { cur = (cur + 1) % N; render(); } }
+        function prev() { if (N > 1) { cur = (cur - 1 + N) % N; render(); } }
+
+        // カードの幅・高さ・輪の半径を決める（画面の幅が変わったときも呼ぶ）
+        function layout() {
+            var avail = wrap.clientWidth || 360;
+            CW = Math.round(Math.max(250, Math.min(360, avail * 0.84)));
+            // 隣のカードの縁が、前のカードに重ならない半径（カードを輪の接線に並べる）に、少しだけ余白を足す
+            R = N > 1 ? Math.round((CW / 2) / Math.tan(step * Math.PI / 360) * 1.06) : 0;
+            ring.style.width = CW + 'px';
+            var max = 0;
+            cards.forEach(function (c) { c.style.width = CW + 'px'; c.style.height = 'auto'; });
+            cards.forEach(function (c) { max = Math.max(max, c.offsetHeight); });
+            RH = max;
+            cards.forEach(function (c) { c.style.height = RH + 'px'; });
+            stage.style.height = RH + 'px';
+            place(0);
+        }
+
+        prevBtn.addEventListener('click', prev);
+        nextBtn.addEventListener('click', next);
+        stage.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+        });
+
+        /* ---- ドラッグ・スワイプ ---- */
+        var drag = null;
+        var moved = false;
+
+        stage.addEventListener('pointerdown', function (e) {
+            if (N < 2 || (e.pointerType === 'mouse' && e.button !== 0)) return;
+            if (e.target.closest('a, button')) return; // 「詳細を見る」などはそのまま使えるように
+            drag = { x: e.clientX, y: e.clientY, id: e.pointerId, dx: 0, horizontal: null };
+            moved = false;
+        });
+        stage.addEventListener('pointermove', function (e) {
+            if (!drag || e.pointerId !== drag.id) return;
+            var dx = e.clientX - drag.x;
+            var dy = e.clientY - drag.y;
+            if (drag.horizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+                drag.horizontal = Math.abs(dx) > Math.abs(dy);
+                if (!drag.horizontal) { drag = null; return; } // 縦の動きは、ページのスクロールにまかせる
+                try { stage.setPointerCapture(e.pointerId); } catch (err) { /* 無視 */ }
+                stage.classList.add('dragging');
+            }
+            if (!drag.horizontal) return;
+            moved = true;
+            drag.dx = dx;
+            place(Math.max(-1, Math.min(1, dx / (CW * 0.55))));
+        });
+        function endDrag(e) {
+            if (!drag || (e && e.pointerId !== drag.id)) return;
+            var d = drag;
+            drag = null;
+            if (!d.horizontal) return;
+            stage.classList.remove('dragging');
+            if (Math.abs(d.dx) > Math.min(90, CW * 0.2)) {
+                if (d.dx < 0) next(); else prev();
+            } else {
+                place(0); // もとの位置にもどす
+            }
+        }
+        stage.addEventListener('pointerup', endDrag);
+        stage.addEventListener('pointercancel', endDrag);
+
+        // 横に見えているカードをクリック → そのカードを前に出す
+        stage.addEventListener('click', function (e) {
+            if (moved) { moved = false; e.preventDefault(); return; } // ドラッグのあとのクリックは無視
+            if (e.target.closest('a, button')) return;
+            var c = e.target.closest('.card');
+            var i = c ? cards.indexOf(c) : -1;
+            if (i >= 0 && i !== cur) goTo(i);
+        });
+
+        render();
+        wrap.classList.toggle('is-single', N < 2);
+
+        return {
+            el: wrap,
+            layout: layout,
+            index: function () { return cur; },
+            goToId: function (id) {
+                for (var i = 0; i < N; i++) { if (cards[i].id === id) { goTo(i); return true; } }
+                return false;
+            }
+        };
+    }
+
+    window.addEventListener('resize', function () { if (ringApi) ringApi.layout(); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (ringApi) ringApi.layout(); });
+
+    // R-SERIES のメニュー：そのプロダクトのカードを前に出して、カルーセルまでスクロール
+    document.addEventListener('click', function (e) {
+        var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+        if (!a || !ringApi) return;
+        var id = a.getAttribute('href').slice(1);
+        if (!id || id === 'products') return;
+        if (ringApi.goToId(id)) {
+            e.preventDefault();
+            ringApi.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+
     function renderProducts(products) {
         var grid = $('#productGrid');
         if (!grid) return;
+        var keep = ringApi ? ringApi.index() : 0;
+        ringApi = null;
         grid.replaceChildren();
         if (!products.length) {
             grid.append(h('p', { class: 'note', text: 'プロダクトを準備中です。' }));
         } else {
-            products.forEach(function (p) { grid.append(buildCard(p)); });
+            ringApi = createRing(products, keep);
+            grid.append(ringApi.el);
+            ringApi.layout(); // 画面に入れてから、大きさを決める
         }
-        reveal(grid);
         renderNav(products);
     }
 

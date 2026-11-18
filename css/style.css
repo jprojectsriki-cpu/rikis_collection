@@ -26,7 +26,7 @@ main,footer{position:relative;z-index:1}
 .site-header{position:fixed;top:0;left:0;right:0;height:var(--hh);z-index:50;display:flex;align-items:center;
   justify-content:space-between;padding:0 clamp(16px,4vw,48px);background:rgba(2,8,23,.92);
   border-bottom:2px solid var(--cyan);backdrop-filter:blur(6px)}
-.brand{font-family:var(--head);color:var(--ice);font-size:1.05rem}
+.brand{font-family:var(--body);font-weight:900;letter-spacing:.04em;color:var(--ice);font-size:1.05rem}
 .brand span{color:var(--cyan);font-size:.7rem;margin-left:.5em}
 .nav{display:flex;gap:6px;align-items:center}
 .nav a,.sub-toggle{font:700 .95rem var(--body);color:var(--ice);background:none;border:0;cursor:pointer;
@@ -88,6 +88,8 @@ main,footer{position:relative;z-index:1}
   padding:1.5rem;clip-path:polygon(0 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%);
   box-shadow:0 0 28px rgba(56,225,255,.12)}
 .panel h3{font:400 1.2rem/1.5 var(--head);margin-bottom:.5em}
+/* 日本語の見出しは、Dela Gothic One だと太すぎて文字がつぶれるため、Zen Kaku Gothic New の太字にする */
+.panel h3.jp{font-family:var(--body);font-weight:900;font-size:1.3rem;letter-spacing:.02em}
 .panel h4{margin:1.2em 0 .4em;color:var(--cyan)}
 .panel p+p{margin-top:.8em}
 .role{color:var(--cyan);font-weight:700}
@@ -108,7 +110,7 @@ main,footer{position:relative;z-index:1}
   background:linear-gradient(180deg,rgba(56,225,255,.16),rgba(56,225,255,0))}
 .adv>*{position:relative;z-index:1}
 .adv .adv-title{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .7rem;margin:.5rem 0 1.1rem;
-  font:400 clamp(1.05rem,2.5vw,1.5rem)/1.4 var(--head)}
+  font:900 clamp(1.05rem,2.4vw,1.45rem)/1.4 var(--body);letter-spacing:.04em}
 .adv-title span{background:var(--night);border:1px solid var(--cyan);padding:.15em .8em;transform:skewX(-8deg);
   box-shadow:4px 4px 0 var(--blue)}
 .adv-title b{color:var(--cyan);font:400 1.7rem/1 var(--head)}
@@ -126,14 +128,18 @@ main,footer{position:relative;z-index:1}
 .bars em{font-style:normal;text-align:right;opacity:.8}
 
 /* ===== Product cards（GAS から作る） ===== */
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.5rem}
-.cards .note{grid-column:1/-1}
 .card{--ac:var(--cyan);padding:0;display:flex;flex-direction:column;border-left-color:var(--ac);
   scroll-margin-top:calc(var(--hh) + 16px)}
 .c-pink{--ac:#ff6b81}.c-cyan{--ac:#38e1ff}.c-green{--ac:#3ee6b4}
 .c-purple{--ac:#b58cff}.c-orange{--ac:#ffa94d}.c-indigo{--ac:#7f8cff}
-.card-img{aspect-ratio:16/9;overflow:hidden;border-bottom:2px solid var(--ac);background:var(--navy)}
-.card-img img{width:100%;height:100%;object-fit:cover;display:block}
+.card-img{position:relative;aspect-ratio:16/9;overflow:hidden;border-bottom:2px solid var(--ac);
+  background:linear-gradient(135deg,#061540,#0f3fa6 55%,#38e1ff)}
+/* 写真は、青〜シアンのモノトーンにそろえる（どんな色の写真でも、サイトの世界観になじむ） */
+.card-img img{width:100%;height:100%;object-fit:cover;display:block;
+  filter:grayscale(1) contrast(1.15) brightness(1.2);mix-blend-mode:multiply}
+.card-img::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(2,8,23,.16) 0 2px,transparent 2px 4px),
+             linear-gradient(180deg,transparent 50%,rgba(2,8,23,.6))}
 .card-fallback{height:100%;display:grid;place-items:center;padding:1rem;text-align:center;
   font:400 clamp(3.6rem,9vw,5rem)/1 var(--head);color:var(--ac);text-shadow:4px 4px 0 var(--blue);
   background:repeating-linear-gradient(-30deg,rgba(56,225,255,.1) 0 14px,transparent 14px 28px),var(--navy)}
@@ -152,6 +158,34 @@ main,footer{position:relative;z-index:1}
 .card .btn:hover{background:var(--ice)}
 .card .btn.off,.card .btn.off:hover{background:rgba(230,250,255,.14);color:#aebfdc;cursor:not-allowed;transform:none}
 .note{opacity:.85}
+
+/* ===== 3D 円形カルーセル ===== */
+.rwrap{position:relative;overflow-x:clip;padding:.5rem 0 0}
+.rstage{position:relative;perspective:1700px;perspective-origin:50% 38%;touch-action:pan-y;cursor:grab;outline-offset:6px}
+.rstage.dragging{cursor:grabbing;user-select:none}
+.rring{position:relative;height:100%;margin:0 auto;transform-style:preserve-3d}
+.rring .card{position:absolute;left:0;top:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  background:#0a1d52;box-shadow:none;
+  transition:transform .75s cubic-bezier(.22,.8,.2,1),opacity .55s ease}
+.rstage.dragging .rring .card{transition:none}
+.rring .card:not(.is-front){cursor:pointer}
+.rring .card:not(.is-front) .card-foot{pointer-events:none}
+.rctl{display:flex;align-items:center;justify-content:center;gap:clamp(1rem,4vw,2rem);margin-top:1.6rem}
+.rbtn{width:52px;height:52px;display:grid;place-items:center;font:400 1.1rem var(--head);cursor:pointer;border:0;
+  background:var(--cyan);color:var(--night);clip-path:polygon(18% 0,100% 0,82% 100%,0 100%);
+  transition:background .15s,transform .15s}
+.rbtn:hover{background:var(--ice)}
+.rbtn:active{transform:scale(.94)}
+.rcount{min-width:5.5em;text-align:center;font:400 1.1rem var(--head);letter-spacing:.12em;color:var(--cyan)}
+.rdots{display:flex;flex-wrap:wrap;justify-content:center;margin:.2rem auto 0;max-width:640px}
+/* 点：見た目は小さく、押せる範囲は大きく（44px） */
+.rdot{position:relative;width:44px;height:44px;background:none;border:0;cursor:pointer}
+.rdot::before{content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;
+  border:2px solid var(--cyan);transform:skewX(-12deg);transition:background .2s,box-shadow .2s}
+.rdot[aria-current]::before{background:var(--cyan);box-shadow:0 0 10px rgba(56,225,255,.7)}
+.rhint{margin-top:.2rem;text-align:center;font-size:.85rem;font-weight:700;opacity:.85}
+.rhint-sp{display:none}
+.is-single .rstage{cursor:default}
 
 /* ===== Buttons ===== */
 .btn{display:inline-block;font:700 1rem var(--body);cursor:pointer;border:0;background:var(--cyan);color:var(--night);
@@ -204,9 +238,11 @@ footer{margin-top:5rem;padding:1.5rem;text-align:center;font-size:.85rem;border-
   .bars u{width:14px;height:14px}
   .bars .seg{gap:4px}
   .bg-clock{right:-45vmin;width:140vmin;opacity:.3}
+  .rhint-pc{display:none}
+  .rhint-sp{display:inline}
+  .card-img{aspect-ratio:2/1}
   .eyebrow{letter-spacing:.2em}
   .eyebrow::after{display:none}
-  .cards{grid-template-columns:1fr}
 }
 
 /* ===== Scroll reveal ===== */
